@@ -1,0 +1,23 @@
+version: '3.8'
+services:
+  app:
+    image: ghcr.io/veridex/backend:latest
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL
+      - REDIS_URL
+      - JWT_SECRET
+    ports:
+      - "4000:4000"
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: veridex
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: veridex
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+  redis:
+    image: redis:7-alpine
+volumes:
+  pgdata:
