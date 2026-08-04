@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  role      String   @default("founder")
+  createdAt DateTime @default(now())
+}
+
+model Opportunity {
+  id           String   @id @default(cuid())
+  source       String
+  externalId   String?  @db.VarChar(191)
+  url          String?
+  title        String?
+  content      String?  
+  raw          Json?
+  confidence   Float    @default(0)
+  freshness    Float    @default(0)
+  status       String   @default("new")
+  priority     Float    @default(0)
+  estimatedEffort Float @default(0)
+  estimatedValue  Float @default(0)
+  riskIndicators Json?
+  tags         String[] @default([])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  processingHistory OpportunityProcessingHistory[]
+
+  @@index([source, externalId])
+  @@index([priority])
+}
+
+model OpportunityProcessingHistory {
+  id         String   @id @default(cuid())
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id])
+  opportunityId String
+  status     String
+  message    String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+}
+
+model RuleSet {
+  id        String @id @default(cuid())
+  name      String
+  version   Int
+  active    Boolean @default(true)
+  rules     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Engagement {
+  id            String  @id @default(cuid())
+  opportunityId String
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id])
+  status        String  @default("new")
+  workspace     Json?
+  drafts        Draft[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Draft {
+  id           String @id @default(cuid())
+  engagement   Engagement @relation(fields: [engagementId], references: [id])
+  engagementId String
+  author       String?
+  template     String?
+  tone         String?
+  content      String
+  confidence   Float  @default(0)
+  status       String @default("draft")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
