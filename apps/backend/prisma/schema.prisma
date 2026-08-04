@@ -1,0 +1,64 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Existing models in this schema may live elsewhere in different branches.
+// This schema file defines the Learning Engine models only and is additive.
+
+model LearningRecord {
+  id             String   @id @default(cuid())
+  opportunityId  String?  @db.VarChar(191)
+  engagementId   String?  @db.VarChar(191)
+  contractId     String?  @db.VarChar(191)
+  clientId       String?  @db.VarChar(191)
+  outcome        String
+  revenue        Float?   @default(0)
+  paymentStatus  String?
+  executionOutcome String?
+  responseTimeMs Int?
+  rejectionReason String?
+  lessons        Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([createdAt])
+  @@index([clientId])
+}
+
+model ProposalPerformance {
+  id               String   @id @default(cuid())
+  learningRecordId String
+  proposalId       String?
+  score            Float?   @default(0)
+  selected         Boolean  @default(false)
+  reason           String?
+  createdAt        DateTime @default(now())
+
+  @@index([learningRecordId])
+}
+
+model ClientProfile {
+  clientId             String  @id
+  lastSeenAt           DateTime?
+  lifetimeRevenue      Float?  @default(0)
+  preferredPricing     Json?
+  preferredProposalStyle Json?
+  returnCount          Int?    @default(0)
+  commonObjections     Json?
+  negotiationPatterns  Json?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model LearningMetric {
+  id         String  @id @default(cuid())
+  name       String
+  key        String  @unique
+  value      Json
+  computedAt DateTime @default(now())
+}
