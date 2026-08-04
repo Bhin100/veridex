@@ -1,0 +1,33 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  role      String   @default("founder")
+  createdAt DateTime @default(now())
+}
+
+model Opportunity {
+  id           String   @id @default(cuid())
+  source       String
+  externalId   String?  @db.VarChar(191)
+  url          String?
+  title        String?
+  content      String?  
+  raw          Json?
+  confidence   Float    @default(0)
+  freshness    Float    @default(0)
+  status       String   @default("new")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([source, externalId])
+}
