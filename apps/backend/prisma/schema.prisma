@@ -26,8 +26,36 @@ model Opportunity {
   confidence   Float    @default(0)
   freshness    Float    @default(0)
   status       String   @default("new")
+  priority     Float    @default(0)
+  estimatedEffort Float @default(0)
+  estimatedValue  Float @default(0)
+  riskIndicators Json?
+  tags         String[] @default([])
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  processingHistory OpportunityProcessingHistory[]
+
   @@index([source, externalId])
+  @@index([priority])
+}
+
+model OpportunityProcessingHistory {
+  id         String   @id @default(cuid())
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id])
+  opportunityId String
+  status     String
+  message    String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+}
+
+model RuleSet {
+  id        String @id @default(cuid())
+  name      String
+  version   Int
+  active    Boolean @default(true)
+  rules     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
