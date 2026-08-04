@@ -1,0 +1,59 @@
+/// Confidence-based Autonomous Approval Engine — Prisma models
+
+model ApprovalPolicy {
+  id           String   @id @default(cuid())
+  name         String   @unique
+  description  String?
+  // JSON object containing factor weights and thresholds. Example shape:
+  // { "weights": { "opportunityQuality": 10, "clientTrust": 8, ... }, "thresholds": { "autoExecute": 90, "manualReview": 75 } }
+  config       Json
+  enabled      Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model ApprovalDecision {
+  id                   String   @id @default(cuid())
+  opportunityId        String   @unique
+  policyId             String
+  decision             String   // AUTO_EXECUTE | MANUAL_REVIEW | AUTO_REJECT
+  confidenceScore      Float
+  confidenceBreakdown  Json     // per-factor scores and weights
+  estimatedProfit      Float?
+  estimatedTimeHours   Float?
+  riskLevel            String?
+  explanation          String?  
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  policy               ApprovalPolicy @relation(fields: [policyId], references: [id])
+}
+
+model DecisionAudit {
+  id            String   @id @default(cuid())
+  decisionId    String
+  actor         String?  // system | founder:<id> | automation
+  action        String   // created | recomputed | overridden | noted
+  details       Json?
+  createdAt     DateTime @default(now())
+
+  // relation kept as loose reference to avoid cascading deletes
+}
+
+model DecisionHistory {
+  id             String   @id @default(cuid())
+  decisionId     String
+  previousDecision String
+  newDecision    String
+  changedBy      String?
+  reason         String?
+  createdAt      DateTime @default(now())
+}
+
+model DecisionMetric {
+  id          String  @id @default(cuid())
+  key         String  @unique
+  name        String
+  value       Json
+  computedAt  DateTime @default(now())
+}
