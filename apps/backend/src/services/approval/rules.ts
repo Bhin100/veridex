@@ -4,8 +4,7 @@ export async function applyVetoRules(opportunity: any, opts: any = {}) {
   const reasons: string[] = []
   // Check payment guardian if available (dynamic)
   try {
-    // @ts-ignore
-    const pg = await import('../payment/guardian').catch(() => null)
+    const pg = (await import('../payments/guardian').catch(() => null)) as any
     if (pg && pg.checkPaymentConfidence) {
       const pc = await pg.checkPaymentConfidence(opportunity)
       if (!pc.ok) reasons.push('payment_confidence_low')

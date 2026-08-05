@@ -42,7 +42,15 @@ export const executionOrchestrator = {
       const anyFailed = (exec.tasks || []).some((t: any) => t.status === 'failed')
       const status = allCompleted ? 'completed' : anyFailed ? 'failed' : 'running'
       // @ts-ignore
-      await db.execution.update({ where: { id: executionId }, data: { status } })
+      const updated = await db.execution.update({ where: { id: executionId }, data: { status }, include: { tasks: true } })
+      if (status === 'completed' || status === 'failed') {
+        try {
+          const { onExecutionFinished } = await import('../../services/workers/learning_integration')
+          await onExecutionFinished(updated)
+        } catch (leErr) {
+          // best effort
+        }
+      }
       return { status }
     } catch (err) {
       // fallback

@@ -1,4 +1,4 @@
-import workersMetrics from './routes/workers_metrics'
+import workersMetrics from './routes/worker_control'
 import workersRoutes from './routes/_workers_index'
 
 export default function registerWorkerRoutes(app: any) {

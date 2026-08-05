@@ -1,5 +1,5 @@
 import { approvalRepository } from '../../repos/approvalRepository'
-import { notifyTelegram } from './telegram'
+import { notifyTelegram } from './telegram.stub'
 
 export async function emitAudit(decisionId: string, actor: string, action: string, details: any) {
   try {

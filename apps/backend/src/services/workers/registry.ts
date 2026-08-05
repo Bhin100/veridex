@@ -12,13 +12,25 @@ class WorkerRegistry extends EventEmitter {
   }
 
   findForTask(type: string) {
+    if (this.registry.size === 0) {
+      try {
+        require('./init').initWorkers()
+      } catch (e) {}
+    }
     for (const w of this.registry.values()) {
       if ((w.supportedTasks || []).includes(type)) return w
     }
     return null
   }
 
-  list() { return Array.from(this.registry.values()) }
+  list() {
+    if (this.registry.size === 0) {
+      try {
+        require('./init').initWorkers()
+      } catch (e) {}
+    }
+    return Array.from(this.registry.values())
+  }
 }
 
 export const workerRegistry = new WorkerRegistry()

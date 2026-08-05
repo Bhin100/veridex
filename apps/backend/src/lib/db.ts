@@ -9,4 +9,12 @@ declare global {
 const prisma = global.__prisma ?? new PrismaClient()
 if (!global.__prisma) global.__prisma = prisma
 
+export async function connectDatabase() {
+  await prisma.$connect()
+}
+
+export async function disconnectDatabase() {
+  await prisma.$disconnect()
+}
+
 export { prisma as db }

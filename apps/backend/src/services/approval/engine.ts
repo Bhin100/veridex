@@ -1,4 +1,4 @@
-import { ApprovalPolicyConfig, DecisionOutcome, FactorResult, EngineResult } from '../../../packages/shared/src/approval/types'
+import { ApprovalPolicyConfig, DecisionOutcome, FactorResult, EngineResult } from '../../../../../packages/shared/src/approval/types'
 import { approvalRepository } from '../../repos/approvalRepository'
 import { learningRepository } from '../../repos/learningRepository'
 import { executionRepo } from '../../repos/executionRepository'
@@ -7,21 +7,26 @@ import { applyVetoRules } from './rules'
 import { emitAudit } from './audit'
 import * as factors from './factors'
 import { recordDecisionMetric } from './metrics'
+import { logger } from '../../logger'
 
 function clamp(n: number) { return Math.max(0, Math.min(100, n)) }
 
 export async function evaluateOpportunity(opportunity: any, opts: { policyId?: string } = {}): Promise<EngineResult> {
+  logger.info({ opportunityId: opportunity.id, policyId: opts.policyId }, 'Evaluating opportunity')
   // load policy
   const policy = await approvalRepository.getEffectivePolicy(opts.policyId)
-  const config: ApprovalPolicyConfig = policy?.config || { weights: {}, thresholds: { autoExecute: 90, manualReview: 75 } }
+  const config: ApprovalPolicyConfig = (policy?.config as any) || { weights: {}, thresholds: { autoExecute: 90, manualReview: 75 } }
+  const policyId = policy?.id || 'default'
 
   // 1) Hard veto checks
   const vetos = await applyVetoRules(opportunity, { policy })
   if (vetos.vetoed) {
-    const decision = 'AUTO_REJECT'
+    const decision: DecisionOutcome = 'AUTO_REJECT'
     const breakdown = { veto: { reason: vetos.reasons } }
     const result = { decision, confidence: 0, breakdown, explanation: `Vetoed: ${vetos.reasons.join('; ')}` }
-    const saved = await approvalRepository.createDecision(opportunity.id, policy.id, decision, 0, breakdown, { estimatedProfit: null, estimatedTimeHours: null, riskLevel: 'high', explanation: result.explanation })
+    logger.warn({ opportunityId: opportunity.id, vetoReasons: vetos.reasons }, 'Opportunity hard vetoed')
+    const saved = await approvalRepository.createDecision(opportunity.id, policyId, decision, 0, breakdown, { estimatedProfit: null, estimatedTimeHours: null, riskLevel: 'high', explanation: result.explanation })
+    if (!saved) throw new Error('Failed to save decision')
     await emitAudit(saved.id, 'system', 'created', { reason: 'veto', details: vetos })
     return { ...result, decisionId: saved.id }
   }
@@ -81,7 +86,9 @@ export async function evaluateOpportunity(opportunity: any, opts: { policyId?: s
   const explanation = `${decision} — ${confidence.toFixed(2)}% — Top factors: ${explanationParts.join(', ')}`
 
   // 7) Persist decision
-  const saved = await approvalRepository.createDecision(opportunity.id, policy.id, decision, confidence, breakdown, { estimatedProfit, estimatedTimeHours, riskLevel, explanation })
+  logger.info({ opportunityId: opportunity.id, decision, confidence }, 'Persisting approval decision')
+  const saved = await approvalRepository.createDecision(opportunity.id, policyId, decision, confidence, breakdown, { estimatedProfit, estimatedTimeHours, riskLevel, explanation })
+  if (!saved) throw new Error('Failed to save decision')
   await emitAudit(saved.id, 'system', 'created', { decision, confidence })
 
   // 8) Metrics
@@ -90,10 +97,12 @@ export async function evaluateOpportunity(opportunity: any, opts: { policyId?: s
   // 9) If auto execute, trigger execution orchestrator
   if (decision === 'AUTO_EXECUTE') {
     try {
+      logger.info({ opportunityId: opportunity.id }, 'Triggering auto execution orchestrator')
       const exec = await executionRepo.createExecution({ opportunityId: opportunity.id, clientId: opportunity.clientId, status: 'pending' } as any)
       await executionOrchestrator.startExecution(exec.id)
       await emitAudit(saved.id, 'system', 'executed', { executionId: exec.id })
     } catch (err) {
+      logger.error({ err, opportunityId: opportunity.id }, 'Auto execution orchestrator failed')
       await emitAudit(saved.id, 'system', 'execution_failed', { error: String(err) })
     }
   }

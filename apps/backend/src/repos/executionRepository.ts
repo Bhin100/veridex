@@ -1,5 +1,5 @@
 import { db } from '../lib/db'
-import type { ExecutionRecord, TaskRecord } from '../../../packages/shared/src/workers/types'
+import type { ExecutionRecord, TaskRecord } from '../../../../packages/shared/src/workers/types'
 
 export class ExecutionRepository {
   async createExecution(exec: Partial<ExecutionRecord>) {
