@@ -1,0 +1,321 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// FOUNDATION & SECURITY MODULE (002)
+// ==========================================
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  role      String   @default("founder")
+  createdAt DateTime @default(now())
+}
+
+// ==========================================
+// OPPORTUNITY DISCOVERY & INTELLIGENCE (003 / 004)
+// ==========================================
+
+model Opportunity {
+  id              String   @id @default(cuid())
+  source          String
+  externalId      String?  @db.VarChar(191)
+  url             String?
+  title           String?
+  content         String?  @db.Text
+  raw             Json?
+  confidence      Float    @default(0)
+  freshness       Float    @default(0)
+  status          String   @default("new")
+  priority        Float    @default(0)
+  estimatedEffort Float    @default(0)
+  estimatedValue  Float    @default(0)
+  riskIndicators  Json?
+  tags            String[] @default([])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  processingHistory OpportunityProcessingHistory[]
+  engagements       Engagement[]
+  contracts         Contract[]
+  decisions         ApprovalDecision[]
+  executions        Execution[]
+
+  @@index([source, externalId])
+  @@index([priority])
+}
+
+model OpportunityProcessingHistory {
+  id            String      @id @default(cuid())
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  opportunityId String
+  status        String
+  message       String?
+  metadata      Json?
+  createdAt     DateTime    @default(now())
+}
+
+model RuleSet {
+  id        String   @id @default(cuid())
+  name      String
+  version   Int
+  active    Boolean  @default(true)
+  rules     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ==========================================
+// CLIENT UNDERSTANDING & ENGAGEMENT (005)
+// ==========================================
+
+model Engagement {
+  id            String      @id @default(cuid())
+  opportunityId String
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  status        String      @default("new")
+  workspace     Json?
+  drafts        Draft[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model Draft {
+  id           String     @id @default(cuid())
+  engagement   Engagement @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  engagementId String
+  author       String?
+  template     String?
+  tone         String?
+  content      String     @db.Text
+  confidence   Float      @default(0)
+  status       String     @default("draft")
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+// ==========================================
+// PAYMENT GUARDIAN & ESCROW CONTRACTS (006)
+// ==========================================
+
+model Contract {
+  id                 String      @id @default(cuid())
+  opportunityId      String
+  opportunity        Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Restrict)
+  clientEmail        String
+  scope              Json
+  pricing            Json
+  depositAmount      Float
+  remainingBalance   Float
+  paymentStatus      String      @default("awaiting_agreement")
+  verificationStatus String      @default("pending")
+  timeline           Json?
+  audit              Json[]      @default([])
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  deposits           Deposit[]
+  executions         Execution[]
+}
+
+model Deposit {
+  id         String   @id @default(cuid())
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  contractId String
+  provider   String
+  providerId String
+  amount     Float
+  currency   String
+  status     String   @default("detected")
+  verified   Boolean  @default(false)
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([provider, providerId])
+}
+
+// ==========================================
+// AUTONOMOUS WORKERS SUBSYSTEM (009)
+// ==========================================
+
+model WorkerState {
+  id        String    @id @default(cuid())
+  workerId  String    @unique
+  name      String
+  version   String
+  status    String
+  lastSeen  DateTime?
+  metadata  Json?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Execution {
+  id            String         @id @default(cuid())
+  contractId    String?
+  contract      Contract?      @relation(fields: [contractId], references: [id], onDelete: SetNull)
+  opportunityId String?
+  opportunity   Opportunity?   @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  clientId      String?
+  client        ClientProfile? @relation(fields: [clientId], references: [clientId], onDelete: SetNull)
+  status        String         @default("pending")
+  priority      Int            @default(0)
+  timeline      Json?
+  audit         Json[]         @default([])
+  tasks         Task[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model Task {
+  id          String    @id @default(cuid())
+  execution   Execution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  executionId String
+  type        String
+  payload     Json
+  status      String    @default("pending")
+  attempts    Int       @default(0)
+  maxAttempts Int?
+  scheduledAt DateTime?
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  workerId    String?
+  result      Json?
+  error       Json?
+  dependsOn   String[]  @default([])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model TaskLog {
+  id          String   @id @default(cuid())
+  taskId      String
+  executionId String
+  event       String
+  details     Json?
+  createdAt   DateTime @default(now())
+}
+
+// ==========================================
+// LEARNING ENGINE MODULE (008)
+// ==========================================
+
+model LearningRecord {
+  id               String   @id @default(cuid())
+  opportunityId    String?  @db.VarChar(191)
+  engagementId     String?  @db.VarChar(191)
+  contractId       String?  @db.VarChar(191)
+  clientId         String?  @db.VarChar(191)
+  outcome          String
+  revenue          Float?   @default(0)
+  paymentStatus    String?
+  executionOutcome String?
+  responseTimeMs   Int?
+  rejectionReason  String?
+  lessons          Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([createdAt])
+  @@index([clientId])
+}
+
+model ProposalPerformance {
+  id               String   @id @default(cuid())
+  learningRecordId String
+  proposalId       String?
+  score            Float?   @default(0)
+  selected         Boolean  @default(false)
+  reason           String?
+  createdAt        DateTime @default(now())
+
+  @@index([learningRecordId])
+}
+
+model ClientProfile {
+  clientId               String      @id
+  lastSeenAt             DateTime?
+  lifetimeRevenue        Float?      @default(0)
+  preferredPricing       Json?
+  preferredProposalStyle Json?
+  returnCount            Int?        @default(0)
+  commonObjections       Json?
+  negotiationPatterns    Json?
+  createdAt              DateTime    @default(now())
+  updatedAt              DateTime    @updatedAt
+  executions             Execution[]
+}
+
+model LearningMetric {
+  id         String   @id @default(cuid())
+  name       String
+  key        String   @unique
+  value      Json
+  computedAt DateTime @default(now())
+}
+
+// ==========================================
+// AUTONOMOUS APPROVAL ENGINE MODULE (009)
+// ==========================================
+
+model ApprovalPolicy {
+  id          String             @id @default(cuid())
+  name        String             @unique
+  description String?
+  config      Json
+  enabled     Boolean            @default(true)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  decisions   ApprovalDecision[]
+}
+
+model ApprovalDecision {
+  id                  String         @id @default(cuid())
+  opportunityId       String         @unique
+  opportunity         Opportunity    @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  policyId            String
+  decision            String         // AUTO_EXECUTE | MANUAL_REVIEW | AUTO_REJECT
+  confidenceScore     Float
+  confidenceBreakdown Json
+  estimatedProfit     Float?
+  estimatedTimeHours  Float?
+  riskLevel           String?
+  explanation         String?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  policy              ApprovalPolicy @relation(fields: [policyId], references: [id], onDelete: Restrict)
+}
+
+model DecisionAudit {
+  id         String   @id @default(cuid())
+  decisionId String
+  actor      String?  // system | founder:<id> | automation
+  action     String   // created | recomputed | overridden | noted
+  details    Json?
+  createdAt  DateTime @default(now())
+}
+
+model DecisionHistory {
+  id               String   @id @default(cuid())
+  decisionId       String
+  previousDecision String
+  newDecision      String
+  changedBy        String?
+  reason           String?
+  createdAt        DateTime @default(now())
+}
+
+model DecisionMetric {
+  id         String   @id @default(cuid())
+  key        String   @unique
+  name       String
+  value      Json
+  computedAt DateTime @default(now())
+}
