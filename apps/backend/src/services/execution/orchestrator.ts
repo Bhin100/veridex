@@ -1,12 +1,46 @@
 import { db } from '../../lib/db'
 import { executionRepo } from '../../repos/executionRepository'
 import { workerManager } from '../../services/workers/manager'
+import { logger } from '../../logger'
 
 export const executionOrchestrator = {
   async startExecution(executionId: string) {
     // Load execution with tasks
     const exec = await executionRepo.getExecution(executionId)
-    if (!exec) throw new Error('execution not found')
+    if (!exec) throw new Error('Execution not found')
+
+    // ==================================================
+    // PAYMENT GATE — STRICT SERVER-SIDE COMPLIANCE CHECK
+    // ==================================================
+    // Find the associated contract to verify payment status
+    let contract = null
+    if (exec.contractId) {
+      // @ts-ignore
+      contract = await db.contract.findUnique({ where: { id: exec.contractId } })
+    } else if (exec.opportunityId) {
+      // @ts-ignore
+      contract = await db.contract.findFirst({ where: { opportunityId: exec.opportunityId } })
+    }
+
+    if (!contract) {
+      logger.warn({ executionId }, 'Payment Gate: Blocking execution because no contract exists.')
+      // Update execution status to BLOCKED / FAILED
+      try {
+        // @ts-ignore
+        await db.execution.update({ where: { id: executionId }, data: { status: 'failed' } })
+      } catch (err) {}
+      throw new Error('Payment Gate: Execution blocked. No valid contract found.')
+    }
+
+    if (contract.paymentStatus !== 'deposit_confirmed') {
+      logger.warn({ executionId, contractId: contract.id, paymentStatus: contract.paymentStatus }, 'Payment Gate: Blocking execution of unpaid contract.')
+      // Update execution status to BLOCKED
+      try {
+        // @ts-ignore
+        await db.execution.update({ where: { id: executionId }, data: { status: 'failed' } })
+      } catch (err) {}
+      throw new Error(`Payment Gate: Work cannot proceed. Contract payment status is ${contract.paymentStatus}. Required deposit_confirmed.`)
+    }
 
     // set status to running
     try {

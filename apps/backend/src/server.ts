@@ -13,6 +13,7 @@ import contractsRouter from './api/routes/contracts'
 import engagementsRouter from './api/routes/engagements'
 import learningRouter from './api/routes/learning'
 import paymentSettingsRouter from './api/routes/payment_settings'
+import telegramRouter from './api/routes/telegram'
 import registerWorkerRoutes from './api/workers.register'
 
 export function createApp() {
@@ -38,6 +39,7 @@ export function createApp() {
   app.use('/api/v1/engagements', engagementsRouter)
   app.use('/api/v1/learning', learningRouter)
   app.use('/api/v1/payment-settings', paymentSettingsRouter)
+  app.use('/api/v1/telegram', telegramRouter)
 
   // Register worker API routes (worker metrics and controls)
   registerWorkerRoutes(app)

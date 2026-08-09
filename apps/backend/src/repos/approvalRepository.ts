@@ -1,6 +1,30 @@
 import { db } from '../lib/db'
 
 export class ApprovalRepository {
+  async getDecision(id: string) {
+    try {
+      // @ts-ignore
+      return await db.approvalDecision.findUnique({
+        where: { id },
+        include: { opportunity: true }
+      })
+    } catch (err) {
+      try {
+        // @ts-ignore
+        const rows = (await db.$queryRawUnsafe(`SELECT * FROM "ApprovalDecision" WHERE id = $1 LIMIT 1`, id)) as any[]
+        if (rows && rows[0]) {
+          const dec = rows[0]
+          // Fetch associated opportunity
+          // @ts-ignore
+          const oppRows = (await db.$queryRawUnsafe(`SELECT * FROM "Opportunity" WHERE id = $1 LIMIT 1`, dec.opportunityId)) as any[]
+          dec.opportunity = oppRows ? oppRows[0] : null
+          return dec
+        }
+      } catch (e) {}
+      return null
+    }
+  }
+
   async getEffectivePolicy(policyId?: string) {
     try {
       if (policyId) {
