@@ -1,0 +1,64 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Additive models for Autonomous Workers
+model WorkerState {
+  id        String @id @default(cuid())
+  workerId  String @unique
+  name      String
+  version   String
+  status    String
+  lastSeen  DateTime?
+  metadata  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Execution {
+  id           String @id @default(cuid())
+  contractId   String?
+  opportunityId String?
+  clientId     String?
+  status       String @default("pending")
+  priority     Int    @default(0)
+  timeline     Json?
+  audit        Json[] @default([])
+  tasks        Task[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Task {
+  id          String @id @default(cuid())
+  execution   Execution @relation(fields: [executionId], references: [id])
+  executionId String
+  type        String
+  payload     Json
+  status      String @default("pending")
+  attempts    Int    @default(0)
+  maxAttempts Int?
+  scheduledAt DateTime?
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  workerId    String?
+  result      Json?
+  error       Json?
+  dependsOn   String[] @default([])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model TaskLog {
+  id        String @id @default(cuid())
+  taskId    String
+  executionId String
+  event     String
+  details   Json?
+  createdAt DateTime @default(now())
+}
